@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎬 实时弹幕词云</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.1.1/src/wordcloud2.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+            gap: 0;
+        }
+        
+        /* 侧边栏 */
+        .sidebar {
+            width: 300px;
+            background: white;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        
+        .sidebar h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            font-weight: 500;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #666;
+            width: 100%;
+        }
+        
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 14px;
+        }
+        
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        /* 排行榜 */
+        .ranking {
+            margin-top: 20px;
+            flex: 1;
+        }
+        
+        .ranking h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .rank-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .rank-medal {
+            width: 28px;
+            text-align: center;
+        }
+        
+        .rank-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .rank-count {
+            color: #888;
+            font-size: 14px;
+        }
+        
+        /* 管理员 */
+        .admin-section {
+            margin-top: auto;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+        }
+        
+        .admin-section summary {
+            cursor: pointer;
+            color: #888;
+            font-size: 14px;
+        }
+        
+        .admin-content {
+            margin-top: 10px;
+        }
+        
+        .admin-content input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            font-size: 14px;
+            padding: 8px 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        
+        /* AI 按钮样式 */
+        .btn-ai {
+            background: linear-gradient(135deg, #00b894, #00cec9);
+            color: white;
+            font-size: 14px;
+            padding: 8px 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .btn-ai:hover {
+            box-shadow: 0 4px 15px rgba(0, 184, 148, 0.4);
+        }
+        
+        .ai-buttons {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px dashed #e0e0e0;
+        }
+        
+        .ai-buttons h4 {
+            color: #00b894;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        /* AI 结果弹窗 */
+        .ai-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .ai-modal.show {
+            display: flex;
+        }
+        
+        .ai-modal-content {
+            background: white;
+            width: 90%;
+            max-width: 700px;
+            max-height: 80vh;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        .ai-modal-header {
+            background: linear-gradient(135deg, #00b894, #00cec9);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .ai-modal-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        
+        .ai-modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+        
+        .ai-modal-body {
+            padding: 20px;
+            max-height: calc(80vh - 60px);
+            overflow-y: auto;
+            line-height: 1.8;
+            white-space: pre-wrap;
+            font-size: 15px;
+        }
+        
+        .ai-loading {
+            text-align: center;
+            padding: 40px;
+            color: #00b894;
+        }
+        
+        .ai-loading .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e0e0e0;
+            border-top-color: #00b894;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 问题展示区 */
+        .question-display {
+            background: rgba(255,255,255,0.95);
+            border-radius: 12px;
+            padding: 15px 20px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .question-display .label {
+            color: #667eea;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .question-display .question-text {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .question-display.empty {
+            opacity: 0.7;
+            font-style: italic;
+        }
+        
+        /* AI 分析结果展示区 - 覆盖在词云上 */
+        .ai-result-display {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            display: none;
+            overflow-y: auto;
+            padding: 30px 40px;
+        }
+        
+        .ai-result-display.show {
+            display: block;
+        }
+        
+        .ai-result-display .ai-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            border-bottom: 3px solid #00b894;
+            padding-bottom: 15px;
+        }
+        
+        .ai-result-display .ai-title {
+            color: #00b894;
+            font-weight: bold;
+            font-size: 28px;
+        }
+        
+        .ai-result-display .ai-close {
+            background: #00b894;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+        
+        .ai-result-display .ai-close:hover {
+            background: #00d2a0;
+            transform: scale(1.1);
+        }
+        
+        .ai-result-display .ai-content {
+            color: #2d3436;
+            line-height: 2.2;
+            font-size: 20px;
+            white-space: pre-wrap;
+        }
+        
+        .ai-result-display .ai-content strong {
+            color: #00b894;
+            font-size: 22px;
+        }
+        
+        /* 问题设置区 */
+        .question-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+        }
+        
+        .question-section h4 {
+            color: #667eea;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .question-section textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            resize: none;
+            height: 60px;
+            margin-bottom: 8px;
+        }
+        
+        .question-section textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn-question {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            font-size: 13px;
+            padding: 8px 15px;
+            margin-right: 5px;
+        }
+        
+        /* 主内容区 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+        
+        .main-content h1 {
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+        
+        /* 词云区域 */
+        .wordcloud-container {
+            flex: 1;
+            background: rgba(255,255,255,0.95);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        #wordcloud {
+            width: 100%;
+            height: 100%;
+        }
+        
+        /* 词云浮动动画 */
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
+        }
+        
+        @keyframes glow {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(1.2); }
+        }
+        
+        #wordcloud span {
+            transition: all 0.3s ease;
+            cursor: default;
+        }
+        
+        #wordcloud span:hover {
+            transform: scale(1.15) !important;
+            filter: brightness(1.3);
+        }
+        
+        /* 新弹幕提示 */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #333;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        /* 手机端适配 */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column-reverse;
+            }
+            
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 40vh;
+                border-radius: 20px 20px 0 0;
+            }
+            
+            .main-content {
+                flex: 1;
+                padding: 15px;
+            }
+            
+            .main-content h1 {
+                font-size: 1.5rem;
+                text-align: center;
+            }
+            
+            .wordcloud-container {
+                min-height: 300px;
+            }
+            
+            .ranking {
+                display: none;
+            }
+            
+            .ai-result-display {
+                padding: 20px;
+            }
+            
+            .ai-result-display .ai-title {
+                font-size: 22px;
+            }
+            
+            .ai-result-display .ai-content {
+                font-size: 16px;
+                line-height: 1.9;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <h2>📝 发送弹幕</h2>
+            
+            <div class="input-group">
+                <label>你的姓名</label>
+                <input type="text" id="nameInput" placeholder="例如：张三" maxlength="20">
+            </div>
+            
+            <div class="input-group">
+                <label>弹幕内容</label>
+                <input type="text" id="contentInput" placeholder="例如：老师讲得好！" maxlength="50">
+            </div>
+            
+            <button class="btn btn-primary" id="sendBtn">🚀 发送弹幕</button>
+            <button class="btn btn-secondary" id="resetBtn">🔄 重置</button>
+            
+            <div id="status" class="status connected">🟢 已连接</div>
+            
+            <!-- 排行榜 -->
+            <div class="ranking">
+                <h3>🏆 发言排行榜</h3>
+                <div id="rankList"></div>
+            </div>
+            
+            <!-- 管理员区域 -->
+            <details class="admin-section">
+                <summary>🔐 管理员</summary>
+                <div class="admin-content">
+                    <input type="password" id="adminPwd" placeholder="管理员密码">
+                    
+                    <!-- 问题设置区 -->
+                    <div class="question-section">
+                        <h4>📋 设置问题</h4>
+                        <textarea id="questionInput" placeholder="输入要让学生回答的问题..."></textarea>
+                        <button class="btn btn-question" id="setQuestionBtn">📤 发布问题</button>
+                        <button class="btn btn-question" id="clearQuestionBtn" style="background:#f0f0f0;color:#666;">清除</button>
+                    </div>
+                    
+                    <!-- AI 功能区 -->
+                    <div class="ai-buttons">
+                        <h4>🤖 AI 智能分析</h4>
+                        <button class="btn btn-ai" id="aiAnalyzeBtn" style="width:100%;">✨ 分析弹幕 · 提炼精华</button>
+                    </div>
+                    
+                    <button class="btn btn-danger" id="clearCloudBtn">清空词云</button>
+                    <button class="btn btn-danger" id="clearAllBtn">清空所有</button>
+                    <a href="/admin.html" style="display:block;text-align:center;padding:8px;background:#f0f0f0;color:#666;border-radius:8px;text-decoration:none;margin-top:10px;font-size:13px;">📊 后台管理</a>
+                </div>
+            </details>
+        </div>
+        
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <h1>🎬 实时弹幕词云</h1>
+            
+            <!-- 当前问题展示 -->
+            <div class="question-display" id="questionDisplay">
+                <div class="label">📋 当前问题</div>
+                <div class="question-text" id="currentQuestion">暂未设置问题，请在管理员区域设置</div>
+            </div>
+            
+            <div class="wordcloud-container">
+                <div id="wordcloud"></div>
+                
+                <!-- AI 分析结果展示 - 覆盖在词云上 -->
+                <div class="ai-result-display" id="aiResultDisplay">
+                    <div class="ai-header">
+                        <span class="ai-title">🤖 AI 智能分析</span>
+                        <button class="ai-close" id="closeAiResult">&times;</button>
+                    </div>
+                    <div class="ai-content" id="aiResultContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 提示 -->
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        const socket = io();
+        
+        const nameInput = document.getElementById('nameInput');
+        const contentInput = document.getElementById('contentInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const statusEl = document.getElementById('status');
+        const rankList = document.getElementById('rankList');
+        const wordcloudEl = document.getElementById('wordcloud');
+        const toast = document.getElementById('toast');
+        
+        let currentCloudData = [];
+        let currentLogs = [];
+        
+        // 显示提示
+        function showToast(message, duration = 2000) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+        
+        // 渲染词云
+        function renderWordCloud(data) {
+            if (!data || data.length === 0) {
+                wordcloudEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:1.2rem;">暂无数据，快来发送第一条弹幕！</div>';
+                return;
+            }
+            
+            wordcloudEl.innerHTML = '';
+            
+            const list = data.map(item => [item.name, item.value]);
+            const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe', '#43e97b', '#fa709a'];
+            
+            const width = wordcloudEl.offsetWidth;
+            const isMobile = width < 600;
+            
+            WordCloud(wordcloudEl, {
+                list: list,
+                gridSize: isMobile ? 12 : 20,
+                weightFactor: function(size) {
+                    const base = isMobile ? 14 : 20;
+                    const factor = isMobile ? 18 : 30;
+                    return base + Math.log(size + 1) * factor;
+                },
+                fontFamily: '-apple-system, BlinkMacSystemFont, Microsoft YaHei, sans-serif',
+                fontWeight: 'bold',
+                color: function() {
+                    return colors[Math.floor(Math.random() * colors.length)];
+                },
+                backgroundColor: 'transparent',
+                rotateRatio: 0,
+                shuffle: false,
+                drawOutOfBound: false
+            });
+            
+            // 词云渲染完成后添加浮动动画
+            setTimeout(() => {
+                const words = wordcloudEl.querySelectorAll('span');
+                words.forEach((word, i) => {
+                    const duration = 2.5 + Math.random() * 2; // 2.5-4.5秒
+                    const delay = Math.random() * 2; // 0-2秒延迟
+                    word.style.animation = `float ${duration}s ease-in-out infinite ${delay}s`;
+                });
+            }, 500);
+        }
+        
+        // 渲染排行榜
+        function renderRanking(logs) {
+            if (!logs || logs.length === 0) {
+                rankList.innerHTML = '<div style="color:#888;font-size:14px;">暂无数据</div>';
+                return;
+            }
+            
+            // 统计每个人的发言数量
+            const counts = {};
+            logs.forEach(log => {
+                counts[log.name] = (counts[log.name] || 0) + 1;
+            });
+            
+            // 排序
+            const sorted = Object.entries(counts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            const medals = ['🥇', '🥈', '🥉'];
+            
+            rankList.innerHTML = sorted.map(([name, count], i) => `
+                <div class="rank-item">
+                    <span class="rank-medal">${medals[i] || (i + 1) + '.'}</span>
+                    <span class="rank-name">${name}</span>
+                    <span class="rank-count">${count}条</span>
+                </div>
+            `).join('');
+        }
+        
+        // 发送弹幕
+        function sendDanmu() {
+            const name = nameInput.value.trim();
+            const content = contentInput.value.trim();
+            
+            if (!name) {
+                showToast('请输入姓名');
+                nameInput.focus();
+                return;
+            }
+            
+            if (!content) {
+                showToast('请输入弹幕内容');
+                contentInput.focus();
+                return;
+            }
+            
+            socket.emit('danmu', { name, content });
+            contentInput.value = '';
+            contentInput.focus();
+        }
+        
+        // 事件绑定
+        sendBtn.addEventListener('click', sendDanmu);
+        
+        contentInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendDanmu();
+        });
+        
+        resetBtn.addEventListener('click', () => {
+            nameInput.value = '';
+            contentInput.value = '';
+            nameInput.focus();
+        });
+        
+        document.getElementById('clearCloudBtn').addEventListener('click', () => {
+            const password = document.getElementById('adminPwd').value;
+            socket.emit('clearCloud', { password });
+        });
+        
+        document.getElementById('clearAllBtn').addEventListener('click', () => {
+            const password = document.getElementById('adminPwd').value;
+            if (confirm('确定要清空所有数据吗？此操作不可恢复！')) {
+                socket.emit('clearAll', { password });
+            }
+        });
+        
+        // Socket 事件
+        socket.on('connect', () => {
+            statusEl.className = 'status connected';
+            statusEl.textContent = '🟢 已连接';
+        });
+        
+        socket.on('disconnect', () => {
+            statusEl.className = 'status disconnected';
+            statusEl.textContent = '🔴 连接断开';
+        });
+        
+        socket.on('init', (data) => {
+            currentCloudData = data.cloudData;
+            currentLogs = data.logs;
+            renderWordCloud(currentCloudData);
+            renderRanking(currentLogs);
+        });
+        
+        socket.on('update', (data) => {
+            currentCloudData = data.cloudData;
+            currentLogs = data.logs;
+            renderWordCloud(currentCloudData);
+            renderRanking(currentLogs);
+            
+            if (data.newDanmu) {
+                showToast(`${data.newDanmu.name}: ${data.newDanmu.content}`);
+            }
+        });
+        
+        socket.on('error', (data) => {
+            showToast('❌ ' + data.message);
+        });
+        
+        socket.on('success', (data) => {
+            showToast('✅ ' + data.message);
+        });
+        
+        // 窗口大小变化时重新渲染
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                renderWordCloud(currentCloudData);
+            }, 300);
+        });
+        
+        // 保存姓名到本地
+        nameInput.value = localStorage.getItem('danmu_name') || '';
+        nameInput.addEventListener('blur', () => {
+            localStorage.setItem('danmu_name', nameInput.value);
+        });
+        
+        // =============== 问题管理功能 ===============
+        const questionDisplay = document.getElementById('questionDisplay');
+        const currentQuestionEl = document.getElementById('currentQuestion');
+        const questionInput = document.getElementById('questionInput');
+        const aiResultDisplay = document.getElementById('aiResultDisplay');
+        const aiResultContent = document.getElementById('aiResultContent');
+        
+        let currentQuestion = '';
+        
+        // 设置问题
+        document.getElementById('setQuestionBtn').addEventListener('click', () => {
+            const password = document.getElementById('adminPwd').value;
+            const question = questionInput.value.trim();
+            if (!password) {
+                showToast('请先输入管理员密码');
+                return;
+            }
+            if (!question) {
+                showToast('请输入问题内容');
+                return;
+            }
+            socket.emit('setQuestion', { password, question });
+        });
+        
+        // 清除问题
+        document.getElementById('clearQuestionBtn').addEventListener('click', () => {
+            const password = document.getElementById('adminPwd').value;
+            if (!password) {
+                showToast('请先输入管理员密码');
+                return;
+            }
+            socket.emit('setQuestion', { password, question: '' });
+            questionInput.value = '';
+        });
+        
+        // 接收问题更新
+        socket.on('questionUpdate', (data) => {
+            currentQuestion = data.question;
+            if (data.question) {
+                currentQuestionEl.textContent = data.question;
+                questionDisplay.classList.remove('empty');
+            } else {
+                currentQuestionEl.textContent = '暂未设置问题，请在管理员区域设置';
+                questionDisplay.classList.add('empty');
+            }
+        });
+        
+        // 关闭 AI 结果展示
+        document.getElementById('closeAiResult').addEventListener('click', () => {
+            aiResultDisplay.classList.remove('show');
+        });
+        
+        // =============== AI 分析功能（简化版）===============
+        // AI 分析弹幕
+        document.getElementById('aiAnalyzeBtn').addEventListener('click', () => {
+            const password = document.getElementById('adminPwd').value;
+            if (!password) {
+                showToast('请先输入管理员密码');
+                return;
+            }
+            showToast('🤖 AI 正在分析中...', 3000);
+            socket.emit('aiAnalyze', { password, question: currentQuestion });
+        });
+        
+        // 接收 AI 处理状态
+        socket.on('aiProcessing', (data) => {
+            showToast(data.message, 3000);
+        });
+        
+        // 接收 AI 结果 - 直接显示在页面上
+        socket.on('aiResult', (data) => {
+            // 简单的 Markdown 转 HTML
+            let html = data.content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            aiResultContent.innerHTML = html;
+            aiResultDisplay.classList.add('show');
+            showToast('✨ AI 分析完成');
+        });
+        
+        // 广播 AI 结果给所有用户
+        socket.on('aiResultBroadcast', (data) => {
+            let html = data.content
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+            aiResultContent.innerHTML = html;
+            aiResultDisplay.classList.add('show');
+        });
+        // ========================================
+    </script>
+</body>
+</html>

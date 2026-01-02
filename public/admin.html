@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 教师后台管理</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        /* 登录页面 */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        
+        .login-box h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            font-size: 1.8rem;
+        }
+        
+        .login-box input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        
+        .login-box input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .login-box button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        
+        .login-box button:hover {
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .login-error {
+            color: #e74c3c;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        /* 管理后台 */
+        .admin-container {
+            display: none;
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 20px 30px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .admin-header h1 {
+            color: #333;
+            font-size: 1.5rem;
+        }
+        
+        .admin-header .btn-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        }
+        
+        /* 统计卡片 */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card h3 {
+            color: #888;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        
+        .stat-card .value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-card.participants .value { color: #10b981; }
+        .stat-card.today .value { color: #f59e0b; }
+        
+        /* 内容区 */
+        .content-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .panel {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .panel-header {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 20px;
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .panel-body {
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        /* 数据表格 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .data-table th,
+        .data-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .data-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #555;
+            position: sticky;
+            top: 0;
+        }
+        
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .data-table .time {
+            color: #888;
+            font-size: 13px;
+        }
+        
+        /* 排行榜 */
+        .rank-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .rank-item:last-child {
+            border-bottom: none;
+        }
+        
+        .rank-medal {
+            width: 35px;
+            font-size: 20px;
+            text-align: center;
+        }
+        
+        .rank-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        
+        .rank-count {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        /* 危险区域 */
+        .danger-zone {
+            background: #fff5f5;
+            border: 2px solid #fed7d7;
+            border-radius: 12px;
+            padding: 20px;
+        }
+        
+        .danger-zone h3 {
+            color: #c53030;
+            margin-bottom: 15px;
+        }
+        
+        .danger-zone p {
+            color: #742a2a;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 8px;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        /* 连接状态 */
+        .connection-status {
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .connection-status.connected {
+            background: #d1fae5;
+            color: #059669;
+        }
+        
+        .connection-status.disconnected {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        
+        /* 搜索框 */
+        .search-box {
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            width: 200px;
+            font-size: 14px;
+        }
+        
+        .search-box:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .content-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .admin-header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .admin-header .btn-group {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+        
+        /* 返回链接 */
+        .back-link {
+            color: white;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+        
+        .back-link:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div class="login-container" id="loginContainer">
+        <div class="login-box">
+            <h1>🔐 教师后台</h1>
+            <input type="password" id="loginPassword" placeholder="请输入管理员密码">
+            <button id="loginBtn">登录</button>
+            <p class="login-error" id="loginError">密码错误，请重试</p>
+            <p style="margin-top: 20px; color: #888; font-size: 14px;">
+                <a href="/" style="color: #667eea;">← 返回词云页面</a>
+            </p>
+        </div>
+    </div>
+    
+    <!-- 管理后台 -->
+    <div class="admin-container" id="adminContainer">
+        <a href="/" class="back-link">← 返回词云页面</a>
+        
+        <div class="admin-header">
+            <h1>🔐 教师后台管理</h1>
+            <div class="btn-group">
+                <span class="connection-status connected" id="connStatus">🟢 已连接</span>
+                <button class="btn btn-success" id="refreshBtn">🔄 刷新数据</button>
+                <button class="btn btn-primary" id="exportBtn">📥 导出CSV</button>
+                <button class="btn btn-secondary" id="logoutBtn">退出登录</button>
+            </div>
+        </div>
+        
+        <!-- 统计卡片 -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <h3>📝 总弹幕数</h3>
+                <div class="value" id="totalCount">0</div>
+            </div>
+            <div class="stat-card participants">
+                <h3>👥 参与人数</h3>
+                <div class="value" id="participantCount">0</div>
+            </div>
+            <div class="stat-card today">
+                <h3>📅 今日弹幕</h3>
+                <div class="value" id="todayCount">0</div>
+            </div>
+        </div>
+        
+        <!-- 内容区 -->
+        <div class="content-row">
+            <!-- 详细记录表 -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>📋 详细记录表</span>
+                    <input type="text" class="search-box" id="searchBox" placeholder="搜索姓名或内容...">
+                </div>
+                <div class="panel-body">
+                    <table class="data-table" id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>序号</th>
+                                <th>姓名</th>
+                                <th>内容</th>
+                                <th>时间</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <tr><td colspan="4" style="text-align:center;color:#888;">暂无数据</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- 排行榜 -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>🏆 发言排行榜</span>
+                </div>
+                <div class="panel-body" id="rankingBody">
+                    <div style="color:#888;text-align:center;">暂无数据</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 危险操作区 -->
+        <div class="danger-zone">
+            <h3>⚠️ 危险操作区</h3>
+            <p>以下操作不可恢复，请谨慎执行！</p>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <button class="btn btn-warning" id="clearCloudBtn">🗑️ 清空词云（保留记录）</button>
+                <button class="btn btn-danger" id="clearAllBtn">💥 清空所有数据</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+    
+    <script>
+        const socket = io();
+        let currentLogs = [];
+        let adminPassword = '';
+        
+        const loginContainer = document.getElementById('loginContainer');
+        const adminContainer = document.getElementById('adminContainer');
+        const loginPassword = document.getElementById('loginPassword');
+        const loginBtn = document.getElementById('loginBtn');
+        const loginError = document.getElementById('loginError');
+        const toast = document.getElementById('toast');
+        const connStatus = document.getElementById('connStatus');
+        
+        // 显示提示
+        function showToast(message, duration = 2000) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), duration);
+        }
+        
+        // 登录
+        function login() {
+            const password = loginPassword.value.trim();
+            if (!password) {
+                showToast('请输入密码');
+                return;
+            }
+            
+            // 验证密码
+            socket.emit('verifyAdmin', { password });
+        }
+        
+        loginBtn.addEventListener('click', login);
+        loginPassword.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') login();
+        });
+        
+        // 登录验证结果
+        socket.on('adminVerified', (data) => {
+            if (data.success) {
+                adminPassword = loginPassword.value;
+                loginContainer.style.display = 'none';
+                adminContainer.style.display = 'block';
+                showToast('✅ 登录成功');
+            } else {
+                loginError.style.display = 'block';
+                setTimeout(() => loginError.style.display = 'none', 3000);
+            }
+        });
+        
+        // 退出登录
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            adminPassword = '';
+            adminContainer.style.display = 'none';
+            loginContainer.style.display = 'flex';
+            loginPassword.value = '';
+        });
+        
+        // 刷新数据
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            socket.emit('requestData');
+            showToast('🔄 数据已刷新');
+        });
+        
+        // 更新统计
+        function updateStats(logs) {
+            document.getElementById('totalCount').textContent = logs.length;
+            
+            // 计算参与人数
+            const participants = new Set(logs.map(log => log.name));
+            document.getElementById('participantCount').textContent = participants.size;
+            
+            // 计算今日弹幕（简单判断）
+            const today = new Date().toDateString();
+            const todayLogs = logs.filter(log => {
+                try {
+                    return new Date(log.time).toDateString() === today;
+                } catch {
+                    return false;
+                }
+            });
+            document.getElementById('todayCount').textContent = todayLogs.length;
+        }
+        
+        // 更新表格
+        function updateTable(logs) {
+            const tbody = document.getElementById('tableBody');
+            
+            if (!logs || logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#888;">暂无数据</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = logs.map((log, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${escapeHtml(log.name)}</td>
+                    <td>${escapeHtml(log.content)}</td>
+                    <td class="time">${log.time || '-'}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // 更新排行榜
+        function updateRanking(logs) {
+            const rankingBody = document.getElementById('rankingBody');
+            
+            if (!logs || logs.length === 0) {
+                rankingBody.innerHTML = '<div style="color:#888;text-align:center;">暂无数据</div>';
+                return;
+            }
+            
+            // 统计
+            const counts = {};
+            logs.forEach(log => {
+                counts[log.name] = (counts[log.name] || 0) + 1;
+            });
+            
+            const sorted = Object.entries(counts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 10);
+            
+            const medals = ['🥇', '🥈', '🥉'];
+            
+            rankingBody.innerHTML = sorted.map(([name, count], i) => `
+                <div class="rank-item">
+                    <span class="rank-medal">${medals[i] || (i + 1) + '.'}</span>
+                    <span class="rank-name">${escapeHtml(name)}</span>
+                    <span class="rank-count">${count}条</span>
+                </div>
+            `).join('');
+        }
+        
+        // 搜索过滤
+        document.getElementById('searchBox').addEventListener('input', (e) => {
+            const keyword = e.target.value.toLowerCase();
+            if (!keyword) {
+                updateTable(currentLogs);
+                return;
+            }
+            
+            const filtered = currentLogs.filter(log => 
+                log.name.toLowerCase().includes(keyword) || 
+                log.content.toLowerCase().includes(keyword)
+            );
+            updateTable(filtered);
+        });
+        
+        // 导出 CSV
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (!currentLogs || currentLogs.length === 0) {
+                showToast('暂无数据可导出');
+                return;
+            }
+            
+            // 创建 CSV 内容
+            const headers = ['序号', '姓名', '内容', '时间'];
+            const rows = currentLogs.map((log, i) => [
+                i + 1,
+                `"${(log.name || '').replace(/"/g, '""')}"`,
+                `"${(log.content || '').replace(/"/g, '""')}"`,
+                `"${log.time || ''}"`
+            ]);
+            
+            const csvContent = '\uFEFF' + headers.join(',') + '\n' + rows.map(r => r.join(',')).join('\n');
+            
+            // 下载
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `弹幕记录_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            showToast('✅ 导出成功');
+        });
+        
+        // 清空词云
+        document.getElementById('clearCloudBtn').addEventListener('click', () => {
+            if (confirm('确定要清空词云吗？弹幕记录将保留。')) {
+                socket.emit('clearCloud', { password: adminPassword });
+            }
+        });
+        
+        // 清空所有
+        document.getElementById('clearAllBtn').addEventListener('click', () => {
+            if (confirm('⚠️ 确定要清空所有数据吗？此操作不可恢复！')) {
+                if (confirm('再次确认：真的要删除所有数据吗？')) {
+                    socket.emit('clearAll', { password: adminPassword });
+                }
+            }
+        });
+        
+        // HTML 转义
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Socket 事件
+        socket.on('connect', () => {
+            connStatus.className = 'connection-status connected';
+            connStatus.textContent = '🟢 已连接';
+        });
+        
+        socket.on('disconnect', () => {
+            connStatus.className = 'connection-status disconnected';
+            connStatus.textContent = '🔴 连接断开';
+        });
+        
+        socket.on('init', (data) => {
+            currentLogs = data.logs || [];
+            updateStats(currentLogs);
+            updateTable(currentLogs);
+            updateRanking(currentLogs);
+        });
+        
+        socket.on('update', (data) => {
+            currentLogs = data.logs || [];
+            updateStats(currentLogs);
+            updateTable(currentLogs);
+            updateRanking(currentLogs);
+        });
+        
+        socket.on('error', (data) => {
+            showToast('❌ ' + data.message);
+        });
+        
+        socket.on('success', (data) => {
+            showToast('✅ ' + data.message);
+        });
+    </script>
+</body>
+</html>

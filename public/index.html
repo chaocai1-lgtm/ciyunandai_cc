@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎬 实时弹幕词云</title>
+    <title>💬 智能互动词云</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.1.1/src/wordcloud2.js"></script>
     <style>
@@ -11,7 +11,7 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Microsoft YaHei', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(120deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
             min-height: 100vh;
             color: #333;
         }
@@ -24,19 +24,22 @@
         
         /* 侧边栏 */
         .sidebar {
-            width: 300px;
-            background: white;
-            padding: 20px;
+            width: 320px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 25px;
             display: flex;
             flex-direction: column;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            box-shadow: 4px 0 20px rgba(0,0,0,0.15);
             overflow-y: auto;
         }
         
         .sidebar h2 {
-            color: #667eea;
-            margin-bottom: 20px;
-            font-size: 1.5rem;
+            color: #0f766e;
+            margin-bottom: 25px;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
         }
         
         .input-group {
@@ -52,133 +55,176 @@
         
         .input-group input {
             width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
+            padding: 14px 16px;
+            border: 2px solid #d1d5db;
+            border-radius: 10px;
             font-size: 16px;
-            transition: border-color 0.3s;
+            transition: all 0.3s;
+            background: #f9fafb;
         }
         
         .input-group input:focus {
             outline: none;
-            border-color: #667eea;
+            border-color: #14b8a6;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.1);
         }
         
         .btn {
-            padding: 12px 20px;
+            padding: 14px 24px;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 16px;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            font-weight: 500;
+            transition: all 0.3s;
+            font-weight: 600;
+            letter-spacing: 0.3px;
         }
         
         .btn:active {
-            transform: scale(0.98);
+            transform: scale(0.97);
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #667eea, #764ba2);
+            background: linear-gradient(135deg, #14b8a6 0%, #0f766e 100%);
             color: white;
             width: 100%;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
         }
         
         .btn-primary:hover {
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+            transform: translateY(-2px);
         }
         
         .btn-secondary {
-            background: #f0f0f0;
-            color: #666;
+            background: #e5e7eb;
+            color: #4b5563;
             width: 100%;
         }
         
+        .btn-secondary:hover {
+            background: #d1d5db;
+        }
+        
         .status {
-            margin-top: 15px;
-            padding: 10px;
-            border-radius: 8px;
+            margin-top: 18px;
+            padding: 12px;
+            border-radius: 10px;
             text-align: center;
             font-size: 14px;
+            font-weight: 500;
         }
         
         .status.connected {
-            background: #d4edda;
-            color: #155724;
+            background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+            color: #065f46;
+            border: 2px solid #34d399;
         }
         
         .status.disconnected {
-            background: #f8d7da;
-            color: #721c24;
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            color: #991b1b;
+            border: 2px solid #f87171;
         }
         
         /* 排行榜 */
         .ranking {
-            margin-top: 20px;
+            margin-top: 25px;
             flex: 1;
         }
         
         .ranking h3 {
-            color: #667eea;
-            margin-bottom: 10px;
-            font-size: 1.1rem;
+            color: #0f766e;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            font-weight: 700;
         }
         
         .rank-item {
             display: flex;
             align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
+            padding: 10px 12px;
+            border-bottom: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin-bottom: 6px;
+            transition: all 0.2s;
+            background: #f9fafb;
+        }
+        
+        .rank-item:hover {
+            background: #f0fdfa;
+            transform: translateX(5px);
         }
         
         .rank-medal {
-            width: 28px;
+            width: 32px;
             text-align: center;
+            font-size: 18px;
         }
         
         .rank-name {
             flex: 1;
-            font-weight: 500;
+            font-weight: 600;
+            color: #1f2937;
         }
         
         .rank-count {
-            color: #888;
+            color: #0f766e;
             font-size: 14px;
+            font-weight: 600;
+            background: #ccfbf1;
+            padding: 4px 10px;
+            border-radius: 12px;
         }
         
         /* 管理员 */
         .admin-section {
             margin-top: auto;
-            padding-top: 20px;
-            border-top: 1px solid #e0e0e0;
+            padding-top: 25px;
+            border-top: 2px solid #e5e7eb;
         }
         
         .admin-section summary {
             cursor: pointer;
-            color: #888;
+            color: #6b7280;
             font-size: 14px;
+            font-weight: 600;
         }
         
         .admin-content {
-            margin-top: 10px;
+            margin-top: 15px;
         }
         
         .admin-content input {
             width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            background: #f9fafb;
+        }
+        
+        .admin-content input:focus {
+            outline: none;
+            border-color: #14b8a6;
+            background: white;
         }
         
         .btn-danger {
-            background: #dc3545;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
             font-size: 14px;
-            padding: 8px 12px;
-            margin-right: 5px;
-            margin-bottom: 5px;
+            padding: 10px 16px;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+        }
+        
+        .btn-danger:hover {
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+            transform: translateY(-1px);
         }
         
         /* AI 按钮样式 */

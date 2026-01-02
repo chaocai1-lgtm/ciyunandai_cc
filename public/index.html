@@ -399,6 +399,82 @@
             left: 0;
         }
         
+        /* ========== 弹幕容器 ========== */
+        .danmu-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+            overflow: hidden;
+        }
+        
+        .danmu-item {
+            position: absolute;
+            right: -100%;
+            white-space: nowrap;
+            font-size: 22px;
+            font-weight: 700;
+            color: #00f5ff;
+            text-shadow: 
+                0 0 10px rgba(0, 245, 255, 0.8),
+                0 0 20px rgba(0, 245, 255, 0.6),
+                2px 2px 4px rgba(0, 0, 0, 0.8);
+            animation: danmu-scroll linear forwards;
+            padding: 6px 14px;
+            background: rgba(10, 14, 26, 0.75);
+            border-radius: 4px;
+            border: 1px solid rgba(0, 245, 255, 0.4);
+        }
+        
+        @keyframes danmu-scroll {
+            from {
+                transform: translateX(0);
+            }
+            to {
+                transform: translateX(calc(-100vw - 100%));
+            }
+        }
+        
+        /* 弹幕颜色变化 */
+        .danmu-item:nth-child(6n+1) {
+            color: #ff0080;
+            text-shadow: 
+                0 0 10px rgba(255, 0, 128, 0.8),
+                0 0 20px rgba(255, 0, 128, 0.6),
+                2px 2px 4px rgba(0, 0, 0, 0.8);
+            border-color: rgba(255, 0, 128, 0.4);
+        }
+        
+        .danmu-item:nth-child(6n+2) {
+            color: #00ff64;
+            text-shadow: 
+                0 0 10px rgba(0, 255, 100, 0.8),
+                0 0 20px rgba(0, 255, 100, 0.6),
+                2px 2px 4px rgba(0, 0, 0, 0.8);
+            border-color: rgba(0, 255, 100, 0.4);
+        }
+        
+        .danmu-item:nth-child(6n+3) {
+            color: #ffaa00;
+            text-shadow: 
+                0 0 10px rgba(255, 170, 0, 0.8),
+                0 0 20px rgba(255, 170, 0, 0.6),
+                2px 2px 4px rgba(0, 0, 0, 0.8);
+            border-color: rgba(255, 170, 0, 0.4);
+        }
+        
+        .danmu-item:nth-child(6n+4) {
+            color: #aa00ff;
+            text-shadow: 
+                0 0 10px rgba(170, 0, 255, 0.8),
+                0 0 20px rgba(170, 0, 255, 0.6),
+                2px 2px 4px rgba(0, 0, 0, 0.8);
+            border-color: rgba(170, 0, 255, 0.4);
+        }
+        
         /* ========== AI 结果展示 ========== */
         .ai-result-display {
             position: absolute;
@@ -590,6 +666,8 @@
             
             <div class="wordcloud-container">
                 <div id="wordcloud"></div>
+                <!-- 弹幕层 -->
+                <div class="danmu-container" id="danmuContainer"></div>
                 
                 <!-- AI 分析结果展示 -->
                 <div class="ai-result-display" id="aiResultDisplay">
@@ -626,6 +704,34 @@
             toast.textContent = message;
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), duration);
+        }
+        
+        // 创建滚动弹幕
+        function createDanmu(text) {
+            const container = document.getElementById('danmuContainer');
+            const danmu = document.createElement('div');
+            danmu.className = 'danmu-item';
+            danmu.textContent = text;
+            
+            // 随机Y轴位置(避开顶部和底部)
+            const containerHeight = container.offsetHeight;
+            const danmuHeight = 40; // 弹幕大致高度
+            const minTop = 50;
+            const maxTop = containerHeight - danmuHeight - 50;
+            const randomTop = Math.random() * (maxTop - minTop) + minTop;
+            danmu.style.top = randomTop + 'px';
+            
+            // 计算滚动时间(根据容器宽度)
+            const containerWidth = container.offsetWidth;
+            const duration = (containerWidth + danmu.offsetWidth) / 100; // 每100px用1秒
+            danmu.style.animationDuration = Math.max(8, duration) + 's'; // 最少8秒
+            
+            container.appendChild(danmu);
+            
+            // 动画结束后移除元素
+            danmu.addEventListener('animationend', () => {
+                danmu.remove();
+            });
         }
         
         // 渲染词云
@@ -775,6 +881,10 @@
             
             if (data.newDanmu) {
                 showToast(`${data.newDanmu.name}: ${data.newDanmu.content}`);
+                // 如果内容较长(超过10个字符),显示为滚动弹幕
+                if (data.newDanmu.content.length > 10) {
+                    createDanmu(data.newDanmu.content);
+                }
             }
         });
         
